@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Editar Producto</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Editar Producto</h1>
+    <div id="alerts"></div>
+    <form class="product-form">
+      <label>Nombre
+        <input type="text" name="nombre" required>
+      </label>
+      <label>Precio
+        <input type="number" name="precio" required min="0" step="0.01">
+      </label>
+      <label>Precio Original
+        <input type="number" name="precio_original" required min="0" step="0.01">
+      </label>
+      <label>Descripción
+        <textarea name="descripcion" required></textarea>
+      </label>
+      <div class="form-actions">
+        <button type="submit" class="btn">Actualizar</button>
+        <a href="index.html" class="btn btn-cancel">Cancelar</a>
+      </div>
+    </form>
+    <div id="loading" class="loading" style="display:none;">Cargando...</div>
+  </div>
+  <script type="module">
+    import { db } from './firebase-config.js';
+    import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
+    const alerts = document.getElementById('alerts');
+    const loadingEl = document.getElementById('loading');
+
+    function showAlert(message, type = 'info') {
+      alerts.innerHTML = `<div class=\"alert alert-${type}\">${message}</div>`;
+      setTimeout(() => { alerts.innerHTML = ''; }, 3000);
+    }
+
+    function getIdFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('id');
+    }
+
+    async function cargarProducto() {
+      const id = getIdFromUrl();
+      if (!id) {
+        showAlert('ID no encontrado en la URL.', 'error');
+        return;
+      }
+      loadingEl.style.display = '';
+      try {
+        const docRef = doc(db, 'productos', id);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const producto = docSnap.data();
+          const form = document.querySelector('.product-form');
+          form.nombre.value = producto.nombre ?? '';
+          form.precio.value = Number(producto.precio) ?? 0;
+          form.precio_original.value = Number(producto.precio_original) ?? 0;
+          form.descripcion.value = producto.descripcion ?? '';
+        } else {
+          showAlert('Producto no encontrado.', 'error');
+        }
+      } catch (error) {
+        showAlert('Error al cargar el producto: ' + error.message, 'error');
+      } finally {
+        loadingEl.style.display = 'none';
+      }
+    }
+
+    cargarProducto();
+
+    document.querySelector('.product-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = getIdFromUrl();
+      if (!id) return;
+      const form = e.target;
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const nombre = form.nombre.value.trim();
+      const precio = Number(form.precio.value);
+      const precio_original = Number(form.precio_original.value);
+      const descripcion = form.descripcion.value.trim();
+
+      if (!nombre || !descripcion || Number.isNaN(precio) || Number.isNaN(precio_original) || precio < 0 || precio_original < 0) {
+        showAlert('Completa todos los campos con valores válidos.', 'error');
+        return;
+      }
+
+      const updateData = { nombre, precio, precio_original, descripcion, updatedAt: Date.now() };
+      try {
+        submitBtn.disabled = true;
+        loadingEl.style.display = '';
+        await updateDoc(doc(db, 'productos', id), updateData);
+        showAlert('Producto actualizado exitosamente', 'success');
+        window.location.href = 'index.html';
+      } catch (error) {
+        showAlert('Error al actualizar el producto: ' + error.message, 'error');
+      } finally {
+        submitBtn.disabled = false;
+        loadingEl.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html> 

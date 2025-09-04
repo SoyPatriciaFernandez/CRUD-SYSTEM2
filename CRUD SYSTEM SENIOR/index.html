@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lista de Productos</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Productos</h1>
+    <a href="create.html" class="btn">Crear Producto</a>
+    <div id="alerts"></div>
+    <div id="loading" class="loading" style="display:none;">Cargando productos...</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Precio</th>
+          <th>Precio Original</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="productos-tbody">
+        <!-- Los productos se cargarán aquí dinámicamente -->
+      </tbody>
+    </table>
+    <div id="empty" class="empty-state" style="display:none;">No hay productos aún.</div>
+  </div>
+  <script type="module">
+    import { db } from './firebase-config.js';
+    import { collection, getDocs } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
+    const alerts = document.getElementById('alerts');
+    const loadingEl = document.getElementById('loading');
+    const emptyEl = document.getElementById('empty');
+
+    const currency = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'USD' });
+
+    function showAlert(message, type = 'info') {
+      alerts.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+      setTimeout(() => { alerts.innerHTML = ''; }, 3000);
+    }
+
+    async function cargarProductos() {
+      const tbody = document.getElementById('productos-tbody');
+      tbody.innerHTML = '';
+      loadingEl.style.display = '';
+      emptyEl.style.display = 'none';
+      alerts.innerHTML = '';
+      try {
+        const querySnapshot = await getDocs(collection(db, "productos"));
+        let count = 0;
+        querySnapshot.forEach((doc) => {
+          count++;
+          const producto = doc.data();
+          const tr = document.createElement('tr');
+          const precio = Number(producto.precio) || 0;
+          const precioOriginal = Number(producto.precio_original) || 0;
+          tr.innerHTML = `
+          <td>${producto.nombre ?? ''}</td>
+          <td>${currency.format(precio)}</td>
+          <td>${currency.format(precioOriginal)}</td>
+          <td>
+            <a href="view.html?id=${doc.id}" class="btn btn-view">Ver</a>
+            <a href="edit.html?id=${doc.id}" class="btn btn-edit">Editar</a>
+            <button class="btn btn-delete" data-id="${doc.id}">Eliminar</button>
+          </td>
+        `;
+          tbody.appendChild(tr);
+        });
+        if (count === 0) {
+          emptyEl.style.display = '';
+        }
+      } catch (error) {
+        showAlert('Error al cargar productos: ' + error.message, 'error');
+      } finally {
+        loadingEl.style.display = 'none';
+      }
+    }
+
+    cargarProductos();
+
+    // Eliminar producto
+    document.getElementById('productos-tbody').addEventListener('click', async (e) => {
+      if (e.target.classList.contains('btn-delete')) {
+        const id = e.target.getAttribute('data-id');
+        if (!id) return;
+        if (!confirm('¿Seguro que deseas eliminar este producto?')) return;
+        e.target.disabled = true;
+        try {
+          const { deleteDoc, doc: docRef } = await import("https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js");
+          await deleteDoc(docRef(db, "productos", id));
+          showAlert('Producto eliminado', 'success');
+          await cargarProductos();
+        } catch (error) {
+          showAlert('Error al eliminar: ' + error.message, 'error');
+        } finally {
+          e.target.disabled = false;
+        }
+      }
+    });
+  </script>
+</body>
+</html>

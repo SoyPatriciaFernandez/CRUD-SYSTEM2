@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Public read of productos; validate writes for schema
+    match /productos/{productId} {
+      allow read: if true;
+      allow create, update: if isValidProducto(request.resource.data);
+      allow delete: if true; // allow deletion publicly (adjust if you add auth)
+    }
+
+    function isValidProducto(data) {
+      return data.keys().hasAll(['nombre', 'precio', 'precio_original', 'descripcion']) &&
+             data.nombre is string &&
+             data.descripcion is string &&
+             data.precio is number && data.precio >= 0 &&
+             data.precio_original is number && data.precio_original >= 0;
+    }
+  }
+} 
